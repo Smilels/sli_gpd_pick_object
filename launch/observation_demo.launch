@@ -1,0 +1,14 @@
+<launch>
+  <node name="bounding_box_preprocess" pkg="sli_gpd_pick_object" type="bounding_box_preprocess"/>
+
+  <node name="GPD_depth_GQCNN" pkg="sli_gpd_pick_object" type="GPD_depth_GQCNN.py"/>
+    <param name="cfg_file"  value="$(find gqcnn)/cfg/ros_nodes/grasp_planner_node.yaml" />
+  </node>
+
+  <include file="$(find sli_gpd_pick_object)/launch/realsense200.launch"/>
+
+  <include file="$(find sli_gpd_pick_object)/launch/gpd_pick_object_service.launch"/>
+
+  <node name="pick_object_demo" pkg="sli_gpd_pick_object" type="pick_object_demo"/>
+  
+</launch>

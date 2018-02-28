@@ -1,0 +1,5 @@
+# request params
+geometry_msgs/Point gripper_position
+---
+# response params
+bool repredict_quality
