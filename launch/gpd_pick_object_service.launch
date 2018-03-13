@@ -1,6 +1,8 @@
 <launch>
   <include file="$(find sli_gpd_pick_object)/launch/gpd/gpd.launch">
-    <arg name="cloud_topic" value="/kinect2/qhd/points" />
+     <!--<arg name="cloud_topic" value="/kinect2/qhd/points" />-->
+    <arg name="cloud_topic" value="/table_top_points" />
+
 
     <!-- Hand geometry parameters
 
