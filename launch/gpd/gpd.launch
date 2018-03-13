@@ -76,6 +76,6 @@
     <param name="min_score_diff" value="0" />
     <param name="min_aperture" value="0.029" />
     <param name="max_aperture" value="0.072" />
-    <param name="num_selected" value="20" />
+    <param name="num_selected" value="50" />
   </node>
 </launch>
