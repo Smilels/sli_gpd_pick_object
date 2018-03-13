@@ -12,8 +12,9 @@
     <arg name="hand_depth" value="0.103" />
     <arg name="hand_height" value="0.06" />
     <arg name="init_bite" value="0.01" />
-    <arg name="use_gmm" value="true" />
+    <arg name="use_gmm" value="false" />
     <arg name="downward_filter" value="true" />
+    <arg name="select_strategy" value="true" />
 
 
   </include>

@@ -7,13 +7,14 @@
   <arg name="init_bite" />
   <arg name="use_gmm" />
   <arg name="downward_filter" />
+  <arg name="select_strategy" />
 
   <!-- Load classifier parameters -->
   <include file="$(find sli_gpd_pick_object)/launch/gpd/classifier_15channels.launch">
-    <arg name="node" value="detect_grasps" />
+    <arg name="node" value="detect_grasps_gmm" />
   </include>
 
-  <node name="detect_grasps" pkg="sli_gpd" type="detect_grasps">
+  <node name="detect_grasps_gmm" pkg="sli_gpd" type="detect_grasps_gmm">
     <param name="finger_width" value="$(arg finger_width)" />
     <param name="hand_outer_diameter" value="$(arg hand_outer_diameter)" />
     <param name="hand_depth" value="$(arg hand_depth)" />
@@ -21,6 +22,7 @@
     <param name="init_bite" value="$(arg init_bite)" />
     <param name="use_gmm" value="$(arg use_gmm)" />
     <param name="downward_filter" value="$(arg downward_filter)" />
+    <param name="select_strategy" value="$(arg select_strategy)" />
 
     <!-- If sequential importance sampling is used (default: false) -->
     <param name="use_importance_sampling" value="false" />
@@ -67,6 +69,8 @@
 
     <!-- Clustering of grasps -->
     <param name="min_inliers" value="1" />
+    <!-- add a new paremeter  -->
+    <param name="cluster_grasps" value="false" />
 
     <!-- Grasp selection -->
     <param name="min_score_diff" value="0" />

@@ -41,7 +41,7 @@ class Bounding_Box_Preprocess{
       pcl::CropBox<Point> box;
       box.setInputCloud(cloud_tf);
       //this is our region of interest
-      box.setMin(Eigen::Vector4f(-0.35,-0.3,0.01,1.0));
+      box.setMin(Eigen::Vector4f(-0.35,-0.3,0.002,1.0));
       box.setMax(Eigen::Vector4f(0.4,0.3,0.25,1.0));
       box.filter (*cloud_filtered);
 

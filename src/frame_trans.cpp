@@ -7,6 +7,10 @@
 #include <Eigen/Geometry>
 #include "tf_conversions/tf_eigen.h"
 #include <eigen_conversions/eigen_msg.h>
+#include<pcl_ros/point_cloud.h>
+#include<pcl_ros/transforms.h>
+#include<pcl_conversions/pcl_conversions.h>
+typedef pcl::PointCloud<pcl::PointXYZ> PointCloud;
 int main(int argc, char** argv){
     ros::init(argc, argv, "object_recognition");
 	ros::NodeHandle nh;
@@ -14,6 +18,7 @@ int main(int argc, char** argv){
 	tf::TransformListener *tf_listener(new tf::TransformListener);
   tf::TransformBroadcaster *tf_pub(new tf::TransformBroadcaster);
   tf::StampedTransform transform;
+  pcl::PCDReader reader;
   try{
     tf_listener->waitForTransform("/r200_camera_link","/table_top", ros::Time::now(),ros::Duration(5.0));
     tf_listener->lookupTransform ("/r200_camera_link","/table_top", ros::Time(0), transform);
@@ -22,6 +27,15 @@ int main(int argc, char** argv){
     std::cout<<"tf listener error"<<std::endl;
     return 1;
   }
+  PointCloud::Ptr source_model1(new PointCloud);
+ reader.read ("/homeL/demo/ws_project/src/project17/pose/pcd_modal/pcd0.005/", *source_model1);
+ source_model1->header.frame_id="/table_top";
+ std::cout<<"indices 1"<<source_model1->points[1].z<<std::endl;
+ std::cout<<"indices 100"<<source_model1->points[100].z<<std::endl;
+  PointCloud::Ptr cloud_processed_table(new PointCloud);
+  pcl_ros::transformPointCloud(*source_model1,*cloud_processed_table,transform);
+  std::cout<<"indices 1"<<cloud_processed_table->points[1].z<<std::endl;
+  std::cout<<"indices 100"<<cloud_processed_table->points[100].z<<std::endl;
 
   Eigen::Affine3d grasp_pose, observation_pose,trans;
 
