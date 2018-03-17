@@ -1,26 +1,49 @@
 #include <ros/ros.h>
 #include <moveit_msgs/GraspPlanning.h>
 #include <moveit_msgs/CollisionObject.h>
-#include <gpd/GraspConfigList.h>
-#include <gpd/GraspConfig.h>
+#include <sli_gpd/GraspConfigList.h>
+#include <sli_gpd/GraspConfig.h>
 #include <mutex>
 #include <tf/transform_datatypes.h>
 #include <tf/transform_listener.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/PointStamped.h>
 #include <geometry_msgs/PoseArray.h>
+#include <tf_conversions/tf_eigen.h>
+#include <eigen_conversions/eigen_msg.h>
 
 #include <moveit/move_group_interface/move_group_interface.h>
+#include <moveit/planning_scene_monitor/planning_scene_monitor.h>
+#include <sli_gpd_pick_object/depth_GQCNNPredict.h>
+
+namespace {
+bool isIKSolutionValid(const planning_scene::PlanningSceneConstPtr planning_scene,
+                       robot_state::RobotState* state, const robot_model::JointModelGroup* jmg,
+                       const double* ik_solution)
+{
+  state->setJointGroupPositions(jmg, ik_solution);
+  state->update();
+  return !planning_scene->isStateColliding(*state, jmg->getName());
+}
+}
 
 class PlanGPDGrasp
 {
+  struct ObservableGrasp {
+      moveit_msgs::Grasp grasp;
+      moveit::core::RobotState observation_state;
+      ObservableGrasp(moveit_msgs::Grasp g, moveit::core::RobotState rs) :
+      grasp(g),
+      observation_state(rs) {}
+    };
 public:
   PlanGPDGrasp(ros::NodeHandle &n)
   {
     clustered_grasps_sub_ = n.subscribe("/detect_grasps_gmm/clustered_grasps", 1000, &PlanGPDGrasp::clustered_grasps_callback, this);
     grasps_visualization_pub_ = n.advertise<geometry_msgs::PoseArray>("grasps_visualization", 10);
     ros::NodeHandle pn("~");
-
+    pn.param("move_offset", move_offset_, 0.50);
+    repredict_quality_=false;
     pn.param("bound_frame", bound_frame_, std::string("table_top"));
     pn.param("x_bound", x_bound_, 0.60);
     pn.param("y_bound", y_bound_, 0.80);
@@ -30,17 +53,20 @@ public:
     pn.param("z_bound_offset", z_bound_offset_, 0.29);
 
     pn.param("grasp_offset", grasp_offset_, -0.08);
-
     pn.param("grasp_cache_time_threshold", grasp_cache_time_threshold_, 5.0);
 
-    std::string move_group_arm;
-    std::string move_group_gripper;
-    pn.param("move_group_arm", move_group_arm, std::string("arm"));
-    pn.param("move_group_gripper", move_group_gripper, std::string("gripper"));
+    pn.param("move_group_arm", move_group_arm_, std::string("arm"));
+    pn.param("move_group_gripper", move_group_gripper_, std::string("gripper"));
 
-    moveit::planning_interface::MoveGroupInterface move_group(move_group_arm);
-    moveit::planning_interface::MoveGroupInterface gripper(move_group_gripper);
+    move_group_ = std::make_shared<moveit::planning_interface::MoveGroupInterface>(move_group_arm_);
+    moveit::planning_interface::MoveGroupInterface gripper(move_group_gripper_);
 
+    psm_= std::make_shared<planning_scene_monitor::PlanningSceneMonitor>("robot_description");
+    psm_->startStateMonitor();
+    psm_->startSceneMonitor("move_group/monitored_planning_scene");
+
+    dexnet_client = n.serviceClient<sli_gpd_pick_object::depth_GQCNNPredict>("depth_gqcnn_predict");
+    observation_poses_pub_= n.advertise<geometry_msgs::PoseStamped>("valid_observation_pose", 1);
     // Setting variables in grasp_candidate_ that are the same for every grasp
     grasp_candidate_.id = "grasp";
 
@@ -49,14 +75,14 @@ public:
 
     grasp_candidate_.post_grasp_retreat.min_distance = 0.13;
     grasp_candidate_.post_grasp_retreat.desired_distance = 0.15;
-    grasp_candidate_.post_grasp_retreat.direction.header.frame_id = move_group.getPlanningFrame();
+    grasp_candidate_.post_grasp_retreat.direction.header.frame_id = move_group_->getPlanningFrame();
     grasp_candidate_.post_grasp_retreat.direction.vector.z = 1.0;
 
     jointValuesToJointTrajectory(gripper.getNamedTargetValues("open"), ros::Duration(1.0), grasp_candidate_.pre_grasp_posture);
     jointValuesToJointTrajectory(gripper.getNamedTargetValues("closed"), ros::Duration(2.0), grasp_candidate_.grasp_posture);
   }
 
-  void clustered_grasps_callback(const gpd::GraspConfigList::ConstPtr& msg)
+  void clustered_grasps_callback(const sli_gpd::GraspConfigList::ConstPtr& msg)
   {
     std::lock_guard<std::mutex> lock(m_);
     ros::Time grasp_stamp = msg->header.stamp;
@@ -85,7 +111,7 @@ public:
     }
   }
 
-  bool grasp_boundry_check(gpd::GraspConfig &grasp)
+  bool grasp_boundry_check(sli_gpd::GraspConfig &grasp)
   {
     geometry_msgs::PointStamped grasp_point;
     geometry_msgs::PointStamped transformed_grasp_point;
@@ -110,7 +136,7 @@ public:
          && transformed_grasp_point.point.z > -z_bound_*0.5+z_bound_offset_);
   }
 
-  geometry_msgs::Pose gpd_grasp_to_pose(gpd::GraspConfig &grasp)
+  geometry_msgs::Pose gpd_grasp_to_pose(sli_gpd::GraspConfig &grasp)
   {
     geometry_msgs::Pose pose;
     tf::Matrix3x3 orientation(grasp.approach.x, grasp.binormal.x, grasp.axis.x,
@@ -131,19 +157,51 @@ public:
     geometry_msgs::PoseArray grasps_visualization;
     grasps_visualization.header.frame_id = frame_id_;
 
+    std::lock_guard<std::mutex> lock(m_);
+    for (auto grasp_candidate:grasp_candidates_)
     {
-      std::lock_guard<std::mutex> lock(m_);
-      for (auto grasp_candidate:grasp_candidates_)
-      {
-        // after the first grasp older than the set amount of seconds is found, break the loop
-        if(grasp_candidate.second.sec < ros::Time::now().sec - grasp_cache_time_threshold_)
-          break;
-        res.grasps.push_back(grasp_candidate.first);
-        grasps_visualization.poses.push_back(grasp_candidate.first.grasp_pose.pose);
-      }
-      grasp_candidates_.clear();
-    }
+      // after the first grasp older than the set amount of seconds is found, break the loop
+      if(grasp_candidate.second.sec < ros::Time::now().sec - grasp_cache_time_threshold_)
+        break;
+      // computing IK
+      planning_scene_monitor::LockedPlanningSceneRO locked_scene(psm_);
+      const planning_scene::PlanningSceneConstPtr scene= static_cast<const planning_scene::PlanningSceneConstPtr>(locked_scene);
+      auto valid_fn= boost::bind(&isIKSolutionValid, scene, _1, _2, _3);
+      moveit::core::RobotState state(scene->getCurrentState());
 
+      const moveit::core::JointModelGroup* jmg= state.getJointModelGroup(move_group_arm_);
+
+      Eigen::Affine3d grasp_pose, observation_pose, trans;
+      tf::poseMsgToEigen(grasp_candidate.first.grasp_pose.pose, grasp_pose);
+      //need tf transfer from the real sense camera position
+
+      grasp_pose= scene->getFrameTransform(grasp_candidate.first.grasp_pose.header.frame_id) * grasp_pose;
+      observation_pose= grasp_pose * Eigen::Translation<double,3>(-move_offset_,0,0);
+
+      tf::StampedTransform transform;
+      try{
+          listener_.waitForTransform("/r200_camera_link", "/s_model_tool0", ros::Time::now(), ros::Duration(5.0));
+          listener_.lookupTransform ("/r200_camera_link", "/s_model_tool0",ros::Time(0), transform);
+        }
+      catch(std::runtime_error &e){
+        std::cout<<"tf error"<<"/n";
+        return 0;
+        }
+      tf::transformTFToEigen (transform, trans);
+      observation_pose=observation_pose * trans;
+
+      if( state.setFromIK(jmg, grasp_pose, 1, 0.1, valid_fn) && state.setFromIK(jmg, observation_pose, 1, 0.1, valid_fn))
+      {
+        ObservableGrasp valid_ik_grasp(grasp_candidate.first,state);//willthe jmg already change to the obvercation_pose state
+        bool repredict_quality=examine_Grasps(valid_ik_grasp);
+        if (repredict_quality){
+           res.grasps.push_back(grasp_candidate.first);
+           grasps_visualization.poses.push_back(grasp_candidate.first.grasp_pose.pose);
+           break;}}
+      else
+        continue;
+    }
+    grasp_candidates_.clear();
     if(res.grasps.empty())
     {
       ROS_INFO("No valid grasp found.");
@@ -151,13 +209,41 @@ public:
     }
     else
     {
-      ROS_INFO("%ld grasps found.", res.grasps.size());
+      ROS_INFO("valid grasps found.");
       res.error_code.val = moveit_msgs::MoveItErrorCodes::SUCCESS;
     }
     grasps_visualization_pub_.publish(grasps_visualization);
-
     return true;
   }
+
+  bool examine_Grasps(ObservableGrasp& grasp_ik)
+  {
+    { geometry_msgs::PoseStamped pose;
+      pose.header.frame_id= move_group_->getPlanningFrame();
+      Eigen::Affine3d p= grasp_ik.observation_state.getGlobalLinkTransform("s_model_tool0");
+      tf::poseEigenToMsg(p, pose.pose);
+      observation_poses_pub_.publish(pose);
+    }
+
+    ROS_INFO("try to observe grasp position");
+    move_group_->setJointValueTarget(grasp_ik.observation_state);
+    if(!move_group_->move())
+      ROS_ERROR("Failed to move to observation pose");
+    else
+    {
+      ROS_INFO("Waiting for image from observation state");
+      ros::Duration(5).sleep();
+      geometry_msgs::PoseStamped based_camera_pose;
+      listener_.transformPose ("/camera_link",grasp_ik.grasp.grasp_pose,based_camera_pose);
+      sli_gpd_pick_object::depth_GQCNNPredict predict_srv;
+      predict_srv.request.gripper_position=based_camera_pose.pose.position;
+      dexnet_client.call(predict_srv);
+      repredict_quality_=predict_srv.response.repredict_quality;
+    }
+    return repredict_quality_;
+  }
+
+    /* returns vector of pairs of feasible grasps and their respective observation poses */
 
 private:
   void jointValuesToJointTrajectory(std::map<std::string, double> target_values, ros::Duration duration,
@@ -203,6 +289,14 @@ private:
 
   // grasps older than this threshold are not considered anymore
   double grasp_cache_time_threshold_;
+  double move_offset_;
+  bool repredict_quality_;
+  planning_scene_monitor::PlanningSceneMonitorPtr psm_;
+  moveit::planning_interface::MoveGroupInterfacePtr move_group_;
+  std::string move_group_arm_;
+  std::string move_group_gripper_;
+  ros::ServiceClient dexnet_client;
+  ros::Publisher observation_poses_pub_;
 };
 
 int main(int argc, char **argv)

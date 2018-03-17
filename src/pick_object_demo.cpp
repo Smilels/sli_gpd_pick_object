@@ -55,7 +55,7 @@ int main(int argc, char **argv)
       po.gripper.setNamedTarget("open");
       while(!po.gripper.move())
         ROS_ERROR("opening gripper failed.");
-      po.arm.setNamedTarget("home");
+      po.arm.setNamedTarget("pour_default");
       while(!po.arm.move())
         ROS_ERROR("moving home failed.");
       ros::Duration(5).sleep();

@@ -1,4 +1,5 @@
 <launch>
+  <node name="sli_gpd_pick_object_bounding_box_preprocess" pkg="sli_gpd_pick_object" type="sli_gpd_pick_object_bounding_box_preprocess"/>
   <include file="$(find sli_gpd_pick_object)/launch/gpd_pick_object_service.launch"/>
-  <node name="pick_object_demo" pkg="sli_gpd_pick_object" type="pick_object_demo"/>
+  <node name="sli_gpd_pick_object_pick_object_demo" pkg="sli_gpd_pick_object" type="sli_gpd_pick_object_pick_object_demo"  output="screen"/>
 </launch>

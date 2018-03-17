@@ -14,7 +14,7 @@
     <arg name="node" value="detect_grasps_gmm" />
   </include>
 
-  <node name="detect_grasps_gmm" pkg="sli_gpd" type="detect_grasps_gmm">
+  <node name="detect_grasps_gmm" pkg="sli_gpd" type="detect_grasps_gmm" output="screen">
     <param name="finger_width" value="$(arg finger_width)" />
     <param name="hand_outer_diameter" value="$(arg hand_outer_diameter)" />
     <param name="hand_depth" value="$(arg hand_depth)" />
@@ -37,7 +37,7 @@
     <!-- Plotting parameters -->
     <param name="plot_normals" value="false" />
     <param name="plot_samples" value="false" />
-    <param name="plot_candidates" value="true" />
+    <param name="plot_candidates" value="false" />
     <param name="plot_filtered_grasps" value="false" />
     <param name="plot_valid_grasps" value="false" />
     <param name="plot_clusters" value="false" />
@@ -68,10 +68,11 @@
     <param name="remove_plane_before_image_calculation" value="false" /> <!-- removes table plane from point cloud to speed up shadow computations -->
 
     <!-- Clustering of grasps -->
-    <param name="min_inliers" value="1" />
+    <param name="min_inliers" value="3" />
     <!-- add a new paremeter  -->
     <param name="cluster_grasps" value="false" />
-
+    <param name="ori_prama" value="0.6" />
+    <param name="mean_prama" value="0.4" />
     <!-- Grasp selection -->
     <param name="min_score_diff" value="0" />
     <param name="min_aperture" value="0.029" />

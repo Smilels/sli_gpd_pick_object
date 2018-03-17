@@ -16,11 +16,11 @@
     <arg name="init_bite" value="0.01" />
     <arg name="use_gmm" value="false" />
     <arg name="downward_filter" value="true" />
-    <arg name="select_strategy" value="true" />
+    <arg name="select_strategy" value="false" />
 
 
   </include>
-  <node name="plan_gpd_grasps_service" pkg="sli_gpd_pick_object" type="plan_grasps_service">
+  <node name="sli_gpd_pick_object_plan_gpd_grasps_service" pkg="sli_gpd_pick_object" type="sli_gpd_pick_object_plan_grasps_service" output="screen">
 
     <param name="bound_frame" value="table_top" />
 
