@@ -32,6 +32,7 @@ public:
     pn.param("grasp_offset_middle", grasp_offset_middle_, -0.13);
     pn.param("grasp_offset_tall", grasp_offset_tall_, -0.08);
     pn.param("grasp_offset_low", grasp_offset_low_, -0.16);
+    pn.param("grasp_offset", grasp_offset_, -0.08);
 
     pn.param("grasp_cache_time_threshold", grasp_cache_time_threshold_, 5.0);
 
