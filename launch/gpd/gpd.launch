@@ -14,7 +14,8 @@
     <arg name="node" value="detect_grasps_gmm" />
   </include>
 
-  <node name="detect_grasps_gmm" pkg="sli_gpd" type="detect_grasps_gmm" output="screen">
+  <node name="detect_grasps_gmm" pkg="sli_gpd" type="detect_grasps_gmm" output="screen" launch-prefix="xterm -e gdb --args">
+
     <param name="finger_width" value="$(arg finger_width)" />
     <param name="hand_outer_diameter" value="$(arg hand_outer_diameter)" />
     <param name="hand_depth" value="$(arg hand_depth)" />
@@ -52,7 +53,7 @@
 
     <!-- General parameters -->
     <param name="num_samples" value="100" />
-    <param name="num_threads" value="4" />
+    <param name="num_threads" value="8" />
 
     <!-- Parameters for local grasp candidate search -->
     <param name="nn_radius" value="0.01" />

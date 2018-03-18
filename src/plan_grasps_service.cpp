@@ -29,7 +29,9 @@ public:
     pn.param("y_bound_offset", y_bound_offset_, 0.0);
     pn.param("z_bound_offset", z_bound_offset_, 0.29);
 
-    pn.param("grasp_offset", grasp_offset_, -0.08);
+    pn.param("grasp_offset_middle", grasp_offset_middle_, -0.13);
+    pn.param("grasp_offset_tall", grasp_offset_tall_, -0.08);
+    pn.param("grasp_offset_low", grasp_offset_low_, -0.16);
 
     pn.param("grasp_cache_time_threshold", grasp_cache_time_threshold_, 5.0);
 
@@ -66,6 +68,27 @@ public:
 
     for(auto grasp:msg->grasps)
     {
+      geometry_msgs::PointStamped grasp_point;
+      geometry_msgs::PointStamped transformed_grasp_point;
+      grasp_point.header.frame_id = frame_id_;
+      grasp_point.point = grasp.top;
+      try
+      {
+        listener_.transformPoint(bound_frame_, grasp_point, transformed_grasp_point);
+      }
+      catch( tf::TransformException ex)
+      {
+        ROS_ERROR("transfrom exception : %s",ex.what());
+      }
+
+      std::cout<<"transformed_grasp_point.point.z"<<transformed_grasp_point.point.z<<std::endl;
+
+      if (transformed_grasp_point.point.z>0.06)
+        grasp_offset_=grasp_offset_tall_;
+      else if(transformed_grasp_point.point.z>0.04)
+       grasp_offset_=grasp_offset_middle_;
+      else
+       grasp_offset_=grasp_offset_low_;
       // shift the grasp according to the offset parameter
       grasp.top.x = grasp.top.x + grasp_offset_ * grasp.approach.x;
       grasp.top.y = grasp.top.y + grasp_offset_ * grasp.approach.y;
@@ -106,8 +129,8 @@ public:
          && transformed_grasp_point.point.x > -x_bound_*0.5+x_bound_offset_
          && transformed_grasp_point.point.y < y_bound_*0.5+y_bound_offset_
          && transformed_grasp_point.point.y > -y_bound_*0.5+y_bound_offset_
-         && transformed_grasp_point.point.z < z_bound_*0.5+z_bound_offset_
-         && transformed_grasp_point.point.z > -z_bound_*0.5+z_bound_offset_);
+         && transformed_grasp_point.point.z < z_bound_*0.5+z_bound_offset_ );
+    //&& transformed_grasp_point.point.z > -z_bound_*0.5+z_bound_offset_
   }
 
   geometry_msgs::Pose gpd_grasp_to_pose(gpd::GraspConfig &grasp)
@@ -135,6 +158,7 @@ public:
       std::lock_guard<std::mutex> lock(m_);
       for (auto grasp_candidate:grasp_candidates_)
       {
+        ROS_INFO("No valid grasp found.");
         // after the first grasp older than the set amount of seconds is found, break the loop
         if(grasp_candidate.second.sec < ros::Time::now().sec - grasp_cache_time_threshold_)
           break;
@@ -200,6 +224,9 @@ private:
 
   // offset of the grasp along the approach vector
   double grasp_offset_;
+  double grasp_offset_tall_;
+  double grasp_offset_low_;
+  double grasp_offset_middle_;
 
   // grasps older than this threshold are not considered anymore
   double grasp_cache_time_threshold_;
