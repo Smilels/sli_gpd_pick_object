@@ -1,9 +1,0 @@
-1.In grasp_detector, add GMM in GraspDetector::classifyGraspCandidates.
-  Change grasp_detector.h , add two functions related to armadillo format and eigen vector, and add new extractGraspsAndImages function
-
-2.change grasp.h, add create shadow part and two struct which copied from grasp_set.cpp,
-  change protected member variables into public
-  
-3. change learning.cpp ,add function about Grasp not Graspset. also in learning.h 
-
-4. change GPD CMakelists.txt, find find_package(Armadillo REQUIRED)  target_link_libraries ${ARMADILLO_LIBRARIES}
