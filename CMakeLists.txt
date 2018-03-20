@@ -49,11 +49,3 @@ add_dependencies(${PROJECT_NAME}_plan_grasps_service ${catkin_EXPORTED_TARGETS})
 
 add_executable(${PROJECT_NAME}_bounding_box_preprocess src/bounding_box_preprocess.cpp)
 target_link_libraries(${PROJECT_NAME}_bounding_box_preprocess ${catkin_LIBRARIES} ${PCL_LIBRARIES})
-
-add_executable(${PROJECT_NAME}_r200camera_positioner src/r200camera_positioner.cpp)
-target_link_libraries(${PROJECT_NAME}_r200camera_positioner ${catkin_LIBRARIES} ${PCL_LIBRARIES})
-
-add_executable(${PROJECT_NAME}_frame_trans src/frame_trans.cpp)
-target_link_libraries(${PROJECT_NAME}_frame_trans ${catkin_LIBRARIES} )
-add_executable(${PROJECT_NAME}_ur5move src/ur5move.cpp)
-target_link_libraries(${PROJECT_NAME}_ur5move ${catkin_LIBRARIES})

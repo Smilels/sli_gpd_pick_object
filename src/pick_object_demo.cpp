@@ -20,7 +20,7 @@ public:
   moveit::planning_interface::MoveGroupInterface arm;
   moveit::planning_interface::MoveGroupInterface gripper;
   moveit::planning_interface::PlanningSceneInterface psi;
-
+  moveit_msgs::PlanningScene planning_scene;
   PickObject() : arm("arm"), gripper("gripper")
   {
     ros::NodeHandle pnh("~");
@@ -34,15 +34,24 @@ public:
   }
 };
 
+octomapCallback(octomap_msgs::Octomap msg)
+{
+ planning_scene.world.octomap.header.frame_id = "odom_combined";
+ planning_scene.world.octomap.header.stamp = ros::Time::now();
+ planning_scene.world.octomap.octomap = msg;
+ octomap_pub.publish(planning_scene);
+}
+
 int main(int argc, char **argv)
 {
   ros::init(argc, argv, "pick_object_demo");
   ros::AsyncSpinner spinner(1);
   spinner.start();
-
+  ros::NodeHandle n;
   PickObject po;
-
+  ros::Subscriber sub = n.subscribe("/octomap_full", 1000, octomapCallback);
   bool success = false;
+  ros::Publisher octomap_pub = n.advertise<moveit_msgs::PlanningScene>("/planning_scene", 1);
 
   ROS_INFO("Picking Object");
   while(ros::ok())
@@ -61,6 +70,7 @@ int main(int argc, char **argv)
       ros::Duration(5).sleep();
       success = false;
     }
+	
     success = po.executePick();
   }
 
